@@ -41,25 +41,37 @@ jobs:
           build/out
           build/Testing
 
-  build-gcc:
+  build-gcc-cross:
     runs-on: ubuntu-20.04
-    container: gcc:11.1.0
+    strategy:
+      matrix:
+        include:
+          - debian: bullseye
+            gcc-version: 10
+          # The following action currently fails due to a bunch of sh4 failing tests
+          # - debian: bookworm
+          #   gcc-version: 12
+          - debian: unstable # warning, unstable!! Don't be surpised if this action fails, or we need to update gcc version
+            gcc-version: 13
+    container: debian:${{ matrix.debian }}
     steps:
     - uses: actions/checkout@v3
     - name: install-build-deps
       run: |
+        GCC=gcc-${{ matrix.gcc-version }}
+        GXX=g++-${{ matrix.gcc-version }}
         # Install cross toolchains
         dpkg --add-architecture i386
         ./install-build-deps.sh update
-        apt-get install -y sudo qemu-user gdb zstd dwarfdump {gcc,g++}-10-{i686,aarch64,riscv64,powerpc,powerpc64,powerpc64le,s390x,sparc64,m68k,sh4,alpha,mips,mipsel}-linux-gnu {gcc,g++}-10-arm-linux-gnueabihf {gcc,g++}-10-{mips64,mips64el}-linux-gnuabi64
+        apt-get install -y sudo qemu-user gdb zstd dwarfdump wget {"$GCC","$GXX"}-{i686,aarch64,riscv64,powerpc,powerpc64,powerpc64le,s390x,sparc64,m68k,sh4,alpha,mips,mipsel}-linux-gnu {"$GCC","$GXX"}-arm-linux-gnueabihf {"$GCC","$GXX"}-{mips64,mips64el}-linux-gnuabi64
 
         for i in i686 aarch64 riscv64 powerpc powerpc64 powerpc64le s390x sparc64 m68k sh4 alpha; do
-          ln -sf /usr/bin/$i-linux-gnu-gcc-10 /usr/bin/$i-linux-gnu-gcc
-          ln -sf /usr/bin/$i-linux-gnu-g++-10 /usr/bin/$i-linux-gnu-g++
+          ln -sf /usr/bin/$i-linux-gnu-$GCC /usr/bin/$i-linux-gnu-gcc
+          ln -sf /usr/bin/$i-linux-gnu-$GXX /usr/bin/$i-linux-gnu-g++
         done
 
-        ln -sf /usr/bin/arm-linux-gnueabihf-gcc-10 /usr/bin/arm-linux-gnueabihf-gcc
-        ln -sf /usr/bin/arm-linux-gnueabihf-g++-10 /usr/bin/arm-linux-gnueabihf-g++
+        ln -sf /usr/bin/arm-linux-gnueabihf-$GCC /usr/bin/arm-linux-gnueabihf-gcc
+        ln -sf /usr/bin/arm-linux-gnueabihf-$GXX /usr/bin/arm-linux-gnueabihf-g++
 
         # Install a RV32 toolchain from third party since it's not available
         # as an Ubuntu package.
@@ -86,7 +98,7 @@ jobs:
       uses: actions/upload-artifact@v3
       if: failure()
       with:
-        name: test-results-gcc
+        name: test-results-gcc-cross-debian-${{ matrix.debian }}
         path: |
           build/out
           build/Testing
