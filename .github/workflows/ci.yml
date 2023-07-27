@@ -103,6 +103,36 @@ jobs:
           build/out
           build/Testing
 
+  build-gcc:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        gcc-version:
+          - 12.3.0
+          - 13.2.0
+    container: gcc:${{ matrix.gcc-version }}
+    steps:
+    - uses: actions/checkout@v3
+    - name: install-build-deps
+      run: ./install-build-deps.sh update
+      shell: bash
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1
+    - name: build and test
+      run: |
+        echo "/usr/lib/ccache:/usr/local/opt/ccache/libexec" >> $GITHUB_PATH
+        cmake -B build -S .
+        cmake --build build --parallel $(nproc)
+        ctest --output-on-failure --test-dir build --parallel $(nproc)
+    - name: archive test results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: test-results-gcc-${{ matrix.gcc-version }}
+        path: |
+          build/out
+          build/Testing
+
   build-macos:
     runs-on: macos-11
     strategy:
